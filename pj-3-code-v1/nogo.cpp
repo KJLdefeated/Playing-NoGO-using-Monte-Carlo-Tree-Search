@@ -74,7 +74,7 @@ int main(int argc, const char* argv[]) {
 	player white("name=white " + white_args + " role=white");
 	if (!shell) { // launch standard local games
 		while (!stats.is_finished()) {
-			//std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
+			std::cerr << "======== Game " << stats.step() << " ========" << std::endl;
 			black.open_episode("~:" + white.name());
 			white.open_episode(black.name() + ":~");
 
@@ -88,6 +88,7 @@ int main(int argc, const char* argv[]) {
 				if (who.check_for_win(game.state())) break;
 			}
 			agent& win = game.last_turns(black, white);
+			std::cerr << win.role() << std::endl;
 			stats.close_episode(win.name());
 
 			black.close_episode(win.name());

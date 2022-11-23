@@ -15,6 +15,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <fstream>
+#include <thread>
 #include "board.h"
 #include "action.h"
 #include "MCTS.h"
@@ -83,10 +84,21 @@ public:
 		if (meta.count("mcts")) search_algo = "mcts";
 		if (meta.count("simu")) max_iter = meta["simu"];
 		if (meta.count("time")) max_sec = meta["time"];
+		if (meta.count("parallel")) parallel = meta["parallel"];
 		if (who == board::empty)
 			throw std::invalid_argument("invalid role: " + role());
 		for (size_t i = 0; i < space.size(); i++)
 			space[i] = action::place(i, who);
+		trees.resize(parallel, NULL);
+	}
+
+	virtual void open_episode(const std::string& flag = "") {
+		board* init = new board;
+		for(int i=0;i<parallel;i++) trees[i] = new MCTS_tree(init, who);
+	}
+
+	virtual void close_episode(const std::string& flag = "") {
+		for(int i=0;i<parallel;i++) delete trees[i];
 	}
 
 	virtual action take_action(const board& state) {
@@ -108,19 +120,19 @@ public:
 	}
 
 	action mcts_action(const board& st){
-		board* b = new board(st);
-		MCTS_node* tmp = new MCTS_node(NULL, b, NULL, who, who);
+		MCTS_node* tmp = new MCTS_node(NULL, new board(st), NULL, who, who);
 
-		if(!b->check_empty() && tree != NULL) tree->advance_tree(tmp);
-		else tree = new MCTS_tree(b, who);
+		tree->advance_tree(tmp);
 
 		if(tree->root->terminal) return action();
 		//cout << "_______________" << endl;cout << "Growing tree..." << endl;
-		tree->grow(max_iter, max_sec);
+		tree->grow(max_iter, max_sec, parallel);
 		//cout << "Tree size:" << tree->size() << endl;cout << "_______________" << endl;
+		
 		MCTS_node *best_child = tree->select_best_child();
+		action::place move = *best_child->move;
 		if(best_child == NULL){
-			cout << "Warning: Tree root has no children! Possibly terminal node!" << endl;
+			//cout << "Warning: Tree root has no children! Possibly terminal node!" << endl;
 			return action();
 		}
 		tree->advance_tree(best_child);
@@ -129,8 +141,9 @@ public:
 
 private:
 	MCTS_tree* tree = NULL;
+	vector<MCTS_tree*> trees;
 	string search_algo="";
-	int max_iter=100, max_sec=40;
+	int max_iter=100, max_sec=1, parallel=1;
 	std::vector<action::place> space;
 	board::piece_type who;
 };
