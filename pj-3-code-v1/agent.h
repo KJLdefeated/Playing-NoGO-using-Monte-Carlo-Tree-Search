@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <fstream>
 #include <thread>
+#include <ctime>
 #include "board.h"
 #include "action.h"
 #include "MCTS.h"
@@ -93,8 +94,10 @@ public:
 	}
 
 	virtual void open_episode(const std::string& flag = "") {
-		board* init = new board;
-		for(int i=0;i<parallel;i++) trees[i] = new MCTS_tree(init, who);
+		for(int i=0;i<parallel;i++) {
+			board* init = new board;
+			trees[i] = new MCTS_tree(init, who);
+		}
 	}
 
 	virtual void close_episode(const std::string& flag = "") {
@@ -120,30 +123,57 @@ public:
 	}
 
 	action mcts_action(const board& st){
-		MCTS_node* tmp = new MCTS_node(NULL, new board(st), NULL, who, who);
-
-		tree->advance_tree(tmp);
-
-		if(tree->root->terminal) return action();
-		//cout << "_______________" << endl;cout << "Growing tree..." << endl;
-		tree->grow(max_iter, max_sec, parallel);
-		//cout << "Tree size:" << tree->size() << endl;cout << "_______________" << endl;
 		
-		MCTS_node *best_child = tree->select_best_child();
-		action::place move = *best_child->move;
-		if(best_child == NULL){
-			//cout << "Warning: Tree root has no children! Possibly terminal node!" << endl;
-			return action();
+		vector<thread> threads;
+
+		for(int i=0;i<parallel;i++) threads.push_back(thread(&player::do_mcts, this, i, st));
+		for(int i=0;i<parallel;i++) threads[i].join();
+
+		int best_idx=0;
+		int best_cnt=0;
+		for(int i=0;i<int(board::size_x*board::size_y);i++){
+			int tot=0;
+			for(int j=0;j<parallel;j++) {
+				tot+=trees[j]->get_simulation_cnt(i);
+			}
+			//cout << trees[0]->get_simulation_cnt(i) << trees[1]->get_simulation_cnt(i) << endl;
+			if(tot > best_cnt) {
+				best_cnt = tot;
+				best_idx = i;
+			}
 		}
-		tree->advance_tree(best_child);
-		return *best_child->move;
+		//cout << best_cnt << endl;
+ 		action::place move(best_idx, who);
+		board b = st;
+		if(move.apply(b) != board::legal) return action();
+		
+		for(int i=0;i<parallel;i++){
+			trees[i]->advance_tree(trees[i]->root->Map_Action2Child[best_idx]);
+		}
+
+		return move;
+
+		//MCTS_node *best_child = tree->select_best_child();
+		//action::place move = *best_child->move;
+		//if(best_child == NULL){
+		//	//cout << "Warning: Tree root has no children! Possibly terminal node!" << endl;
+		//	return action();
+		//}
+		//tree->advance_tree(best_child);
+		//return *best_child->move;
+	}
+
+	void do_mcts(int i, board b){
+		MCTS_node* tmp = new MCTS_node(NULL, new board(b), NULL, who, who);
+		trees[i]->advance_tree(tmp);
+		trees[i]->grow(max_iter, max_sec);
 	}
 
 private:
-	MCTS_tree* tree = NULL;
+	//MCTS_tree* tree = NULL;
 	vector<MCTS_tree*> trees;
 	string search_algo="";
-	int max_iter=100, max_sec=1, parallel=1;
+	int max_iter=100, max_sec=3, parallel=1;
 	std::vector<action::place> space;
 	board::piece_type who;
 };

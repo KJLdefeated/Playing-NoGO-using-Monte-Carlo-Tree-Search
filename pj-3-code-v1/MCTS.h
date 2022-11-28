@@ -9,15 +9,17 @@
 #include <algorithm>
 #include <fstream>
 #include <thread>
+#include <ctime>
 #include <queue>
 #include "board.h"
 #include "action.h"
 
 using namespace std;
 
+default_random_engine engine;
+
 class MCTS_node {
 public:
-    std::default_random_engine engine;
     board::piece_type who;
     board::piece_type me;
     bool terminal=0;
@@ -83,7 +85,7 @@ public:
             parent->backpropagate(w,n,history);
         }
     }
-    void expand(int parallel){
+    void expand(){
         if(terminal){
             return;
         }
@@ -100,22 +102,22 @@ public:
         
         Map_Action2Child[next_move->position().i] = new_node;
         
-        int value = rollout(new_node, parallel);
-        
         set<int>* travelhistory = new set<int>;
 
-        new_node->backpropagate(value, parallel, travelhistory);
+        int value = simulate(*new_node->state, new_node->who);
 
+        new_node->backpropagate(value, 1, travelhistory);
+        
+        travelhistory->clear();
         delete travelhistory;
 
         child->push_back(new_node);
     }
 
+    //Use to do leaf parallelization
     int rollout(MCTS_node* node, int parallel){
-        vector<thread> threads;
         vector<int> result(parallel,0);
-        for(int i=0;i<parallel;i++) threads.push_back(thread(&MCTS_node::simulate, this, *node->state, node->who, ref(result[i])));
-        for(int i=0;i<parallel;i++) threads[i].join();
+        //simulate(*node->state, node->who);
         int total=0;
         for(auto it:result){
             total+=it;
@@ -123,14 +125,15 @@ public:
         return total;
     }
 
-    void simulate(board b, board::piece_type op, int &result){
+    int simulate(board b, board::piece_type op{
         action::place* mv = get_random_move(b, op);
         while(mv != NULL){
+            //s->insert(mv->position().i);
             b.place(mv->position());
             op = swt(op);
             mv = get_random_move(b, op);
         }
-        result = (op == me);
+        return (op == me);
     }
 
     action::place* get_random_move(board b, board::piece_type op){
@@ -150,8 +153,9 @@ public:
     }
 
     double uct_value(MCTS_node* node, double c){
+        double b = 0.025;
         double beta = 
-        1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * 0.025 * 0.025);
+        1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * b * b);
         //cout << beta << endl;
         double winrate = node->score / (1.0 * node->number_of_simulations+1);
         double rave_winrate = node->rave_score / (1.0 * node->rave_number_of_simulations+1);
@@ -220,7 +224,7 @@ public:
     MCTS_node* select_best_child(){
         return root->select_best_child(0.0);
     }
-    void grow(int maxiter, double max_time, int parallel){
+    void grow(int maxiter, double max_time){
         MCTS_node* node;
         double dt;
 
@@ -230,7 +234,7 @@ public:
             
             node = select();
 
-            node->expand(parallel);
+            node->expand();
 
             time(&now_t);
             dt = difftime(now_t, start_t);
@@ -245,6 +249,16 @@ public:
         MCTS_node* old = root;
         root = root->advance_tree(next);
         delete old;
+    }
+
+    int get_simulation_cnt(int i){
+        if(root->Map_Action2Child[i]==NULL) return 0;
+        return root->Map_Action2Child[i]->number_of_simulations;
+    }
+
+    double get_winrate(int i){
+        if(root->Map_Action2Child[i]==NULL) return 0;
+        return root->uct_value(root->Map_Action2Child[i], 0);
     }
 
 public:
