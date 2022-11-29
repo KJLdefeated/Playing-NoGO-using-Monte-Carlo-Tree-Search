@@ -1,0 +1,43 @@
+\documentclass{article} % This command is used to set the type of document you are working on such as an article, book, or presenation
+\usepackage{geometry} % This package allows the editing of the page layout
+\usepackage{amsmath}  % This package allows the use of a large range of mathematical formula, commands, and symbols
+\usepackage{graphicx}  % This package allows the importing of images
+
+\newcommand{\question}[2][]{\begin{flushleft}\textbf{Question #1}: \textit{#2}\end{flushleft}}
+\newcommand{\sol}{\textbf{Solution}:} %Use if you want a boldface solution line
+\newcommand{\maketitletwo}[2][]{\begin{center}
+        \Large{\textbf{Project 1 Report}
+        
+            Theory of Computer Game} % Name of course here
+        \vspace{5pt}
+        
+        \normalsize{
+            Name: Kai-Jie Lin 
+            
+            Student ID: 110652019
+            
+            \today}
+        \vspace{15pt}
+        \end{center}}
+\begin{document}
+    \maketitletwo[5]  % Optional argument is assignment number
+    %Keep a blank space between maketitletwo and \question[1]
+    
+    \section{Method and Improvement} 
+    The method I use for this game is monte carlo tree search with root parallelization. Total number of simulation is set to 
+    1350 and every thinking time is limited to 3 seconds in order not to exceed the total thinking time 40 seconds in a game.
+    This agent can reach 100 winrate against to weak judge. While againsting with medium and strong one it not performed well. 
+    I have tried to do RAVE, but the result is worse than the default one. I have not figured it out why.
+    \section{Experiment}
+    Winrate is calculating by playing 50 games with judges. \\
+    Every agent runs 1350 simulation and thinking 3 seconds per action.\\
+    \begin{tabular}[t]{lll}
+    \hline
+    method & weak & medium\\
+    \hline
+    Default & 94\% & 20\% \\
+    2 parallel & 100\% & 35\% \\ 
+    4 parallel & 100\% & 48\% \\
+    \hline
+    \end{tabular}
+\end{document}

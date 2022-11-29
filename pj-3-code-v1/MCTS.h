@@ -125,7 +125,7 @@ public:
         return total;
     }
 
-    int simulate(board b, board::piece_type op{
+    int simulate(board b, board::piece_type op){
         action::place* mv = get_random_move(b, op);
         while(mv != NULL){
             //s->insert(mv->position().i);
@@ -154,8 +154,8 @@ public:
 
     double uct_value(MCTS_node* node, double c){
         double b = 0.025;
-        double beta = 
-        1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * b * b);
+        double beta = 0;
+        //1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * b * b);
         //cout << beta << endl;
         double winrate = node->score / (1.0 * node->number_of_simulations+1);
         double rave_winrate = node->rave_score / (1.0 * node->rave_number_of_simulations+1);
