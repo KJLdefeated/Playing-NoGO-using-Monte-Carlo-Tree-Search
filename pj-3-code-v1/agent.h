@@ -84,7 +84,7 @@ public:
 		if (role() == "white") who = board::white;
 		if (meta.count("mcts")) search_algo = "mcts";
 		if (meta.count("simu")) max_iter = meta["simu"];
-		if (meta.count("time")) max_sec = meta["time"];
+		if (meta.count("time")) max_time = meta["time"];
 		if (meta.count("parallel")) parallel = meta["parallel"];
 		if (who == board::empty)
 			throw std::invalid_argument("invalid role: " + role());
@@ -96,7 +96,7 @@ public:
 	virtual void open_episode(const std::string& flag = "") {
 		for(int i=0;i<parallel;i++) {
 			board* init = new board;
-			trees[i] = new MCTS_tree(init, who);
+			trees[i] = new MCTS_tree(init, who, max_time);
 		}
 	}
 
@@ -123,7 +123,6 @@ public:
 	}
 
 	action mcts_action(const board& st){
-		
 		vector<thread> threads;
 
 		for(int i=0;i<parallel;i++) threads.push_back(thread(&player::do_mcts, this, i, st));
@@ -152,28 +151,25 @@ public:
 		}
 
 		return move;
+	}
 
-		//MCTS_node *best_child = tree->select_best_child();
-		//action::place move = *best_child->move;
-		//if(best_child == NULL){
-		//	//cout << "Warning: Tree root has no children! Possibly terminal node!" << endl;
-		//	return action();
-		//}
-		//tree->advance_tree(best_child);
-		//return *best_child->move;
+	double remainingtime(double sec, board b){
+		return sec/(1.0 + 1.0*b.count_stone());
 	}
 
 	void do_mcts(int i, board b){
 		MCTS_node* tmp = new MCTS_node(NULL, new board(b), NULL, who, who);
 		trees[i]->advance_tree(tmp);
-		trees[i]->grow(max_iter, max_sec);
+		trees[i]->max_time -= trees[i]->grow(max_iter, remainingtime(trees[i]->max_time, b), p_earlystop);
 	}
 
 private:
 	//MCTS_tree* tree = NULL;
 	vector<MCTS_tree*> trees;
-	string search_algo="";
-	int max_iter=100, max_sec=3, parallel=1;
+	string search_algo="random";
+	int max_iter=1500, parallel=1;
+	int max_time=40;
+	double p_earlystop = 0.9;
 	std::vector<action::place> space;
 	board::piece_type who;
 };

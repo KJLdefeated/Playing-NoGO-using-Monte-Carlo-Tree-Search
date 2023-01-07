@@ -72,12 +72,12 @@ public:
         number_of_simulations += n;
         score += w;
 
-        for(auto i:*history){
-            if(Map_Action2Child[i]!=NULL){
-                Map_Action2Child[i]->rave_number_of_simulations+=n;
-                Map_Action2Child[i]->rave_score+=w;
-            }
-        }
+        //for(auto i:*history){
+        //    if(Map_Action2Child[i]!=NULL){
+        //        Map_Action2Child[i]->rave_number_of_simulations+=n;
+        //        Map_Action2Child[i]->rave_score+=w;
+        //    }
+        //}
 
         if(parent != NULL){
             parent->size++;
@@ -160,7 +160,7 @@ public:
         double winrate = node->score / (1.0 * node->number_of_simulations+1);
         double rave_winrate = node->rave_score / (1.0 * node->rave_number_of_simulations+1);
         double exploitation = (who != me ? (1-beta) * winrate + beta * rave_winrate : (1-beta) * (1-winrate) + beta * (1-rave_winrate));
-        double exploration = sqrt(c * log(this->number_of_simulations) / (1.0 * node->number_of_simulations + 1));
+        double exploration = sqrt(c * log(this->number_of_simulations+1) / (1.0 * node->number_of_simulations + 1));
         return exploitation + exploration;
     }
 
@@ -204,8 +204,9 @@ public:
 class MCTS_tree{
 public:
     MCTS_tree(){};
-    MCTS_tree(board* starting, board::piece_type who){
+    MCTS_tree(board* starting, board::piece_type who, double t){
         me = who;
+        max_time = t;
         root = new MCTS_node(NULL, starting, NULL, who, me);
     }
     ~MCTS_tree() {
@@ -224,9 +225,9 @@ public:
     MCTS_node* select_best_child(){
         return root->select_best_child(0.0);
     }
-    void grow(int maxiter, double max_time){
+    int grow(int maxiter, int max_t, double p_stop){
         MCTS_node* node;
-        double dt;
+        int dt;
 
         time_t start_t, now_t;
         time(&start_t);
@@ -236,14 +237,31 @@ public:
 
             node->expand();
 
+            int max1=0, max2=0;
+            for(auto *ch:*root->child){
+                
+                int cnt = ch->number_of_simulations;
+                
+                if(cnt > max1){
+                    max2=max1;
+                    max1=cnt;
+                }
+                else if(cnt > max2){
+                    max2 = cnt;
+                }
+            }
+
             time(&now_t);
             dt = difftime(now_t, start_t);
-            if(dt > max_time){
+            
+            if(dt > max_t || (p_stop*(i+1)*(max_t-dt) < 1.0*(max1-max2)*dt)){
                 cout << "Early stopping: Made " << (i+1) << "iterations in " << dt << " seconds." << endl;
                 break;
             }
         }
-        //time(&now_t);dt = difftime(now_t, start_t);cout << "Finished in " << dt << "seconds." <<endl;
+        time(&now_t);
+        dt = difftime(now_t, start_t);
+        return min(dt, max_t);
     }
     void advance_tree(MCTS_node* next){
         MCTS_node* old = root;
@@ -265,4 +283,5 @@ public:
     board::piece_type who;
     board::piece_type me;
     MCTS_node *root=NULL;
+    int max_time;
 };

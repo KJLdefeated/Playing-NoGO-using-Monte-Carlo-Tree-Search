@@ -120,6 +120,18 @@ public:
 		return true;
 	}
 
+	int count_stone(){
+		int cnt=0;
+		for(int i=0;i<size_x;i++){
+			for(int j=0;j<size_y;j++){
+				if(stone[i][j] != empty && stone[i][j] != hollow){
+					cnt++;
+				}
+			}
+		}
+		return cnt;
+	}
+
 	/**
 	 * place a stone to the specific position
 	 * who == piece_type::unknown indicates automatically play as the next side
