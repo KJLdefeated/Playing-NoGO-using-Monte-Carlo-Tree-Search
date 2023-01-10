@@ -37,7 +37,7 @@ public:
 
     MCTS_node(MCTS_node *parent, board* state, action::place* move, board::piece_type who, board::piece_type me)
          : parent(parent), state(state), score(0.0), move(move), number_of_simulations(0), size(0), who(who), me(me) 
-         ,rave_number_of_simulations(0), rave_score(0.0){
+         ,rave_number_of_simulations(40), rave_score(32.0){
         untried_actions = new vector<action::place*>;
         Map_Action2Child.resize((board::size_x)*(board::size_y), NULL);
         for(int i=0;i < (board::size_x)*(board::size_y);i++){
@@ -72,16 +72,16 @@ public:
         number_of_simulations += n;
         score += w;
 
-        //for(auto i:*history){
-        //    if(Map_Action2Child[i]!=NULL){
-        //        Map_Action2Child[i]->rave_number_of_simulations+=n;
-        //        Map_Action2Child[i]->rave_score+=w;
-        //    }
-        //}
+        for(auto i:*history){
+            if(Map_Action2Child[i]!=NULL){
+                Map_Action2Child[i]->rave_number_of_simulations+=n;
+                Map_Action2Child[i]->rave_score+=w;
+            }
+        }
 
         if(parent != NULL){
             parent->size++;
-            history->insert(move->position().i);
+            //history->insert(move->position().i);
             parent->backpropagate(w,n,history);
         }
     }
@@ -152,11 +152,11 @@ public:
         return move[0];
     }
 
-    double uct_value(MCTS_node* node, double c){
+    double uct_value(MCTS_node* node, double c, bool RAVE){
         double b = 0.025;
-        double beta = 0;
-        //1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * b * b);
+        double beta = 1.0*node->rave_number_of_simulations / (1.0 * node->number_of_simulations + 1.0 * node->rave_number_of_simulations + 4.0 * node->number_of_simulations * node->rave_number_of_simulations * b * b);
         //cout << beta << endl;
+        if(!RAVE) beta = 0;
         double winrate = node->score / (1.0 * node->number_of_simulations+1);
         double rave_winrate = node->rave_score / (1.0 * node->rave_number_of_simulations+1);
         double exploitation = (who != me ? (1-beta) * winrate + beta * rave_winrate : (1-beta) * (1-winrate) + beta * (1-rave_winrate));
@@ -164,7 +164,7 @@ public:
         return exploitation + exploration;
     }
 
-    MCTS_node* select_best_child(double c){
+    MCTS_node* select_best_child(double c, bool RAVE){
         if(child->empty())return NULL;
         double uct, max = -1;
         MCTS_node* best = NULL;
@@ -172,7 +172,7 @@ public:
         for(auto *ch:*child){
             if(ch->number_of_simulations == 0) return ch;
             
-            uct = uct_value(ch, c);
+            uct = uct_value(ch, c, RAVE);
             
             if(uct > max){
                 max = uct;
@@ -204,9 +204,10 @@ public:
 class MCTS_tree{
 public:
     MCTS_tree(){};
-    MCTS_tree(board* starting, board::piece_type who, double t){
+    MCTS_tree(board* starting, board::piece_type who, int t, bool rave){
         me = who;
         max_time = t;
+        RAVE = rave;
         root = new MCTS_node(NULL, starting, NULL, who, me);
     }
     ~MCTS_tree() {
@@ -217,13 +218,13 @@ public:
 
         while(!node->terminal){
             if(!node->is_fully_expanded()) return node;
-            else node = node->select_best_child(c);
+            else node = node->select_best_child(c, RAVE);
         }
         return node;
     }
     
     MCTS_node* select_best_child(){
-        return root->select_best_child(0.0);
+        return root->select_best_child(0.0, false);
     }
     int grow(int maxiter, int max_t, double p_stop){
         MCTS_node* node;
@@ -254,7 +255,7 @@ public:
             time(&now_t);
             dt = difftime(now_t, start_t);
             
-            if(dt > max_t || (p_stop*(i+1)*(max_t-dt) < 1.0*(max1-max2)*dt)){
+            if(dt > max_t){
                 cout << "Early stopping: Made " << (i+1) << "iterations in " << dt << " seconds." << endl;
                 break;
             }
@@ -276,7 +277,7 @@ public:
 
     double get_winrate(int i){
         if(root->Map_Action2Child[i]==NULL) return 0;
-        return root->uct_value(root->Map_Action2Child[i], 0);
+        return root->uct_value(root->Map_Action2Child[i], 0, false);
     }
 
 public:
@@ -284,4 +285,5 @@ public:
     board::piece_type me;
     MCTS_node *root=NULL;
     int max_time;
+    bool RAVE;
 };

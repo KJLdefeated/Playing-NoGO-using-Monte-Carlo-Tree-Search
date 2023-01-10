@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "GoGui-Server Launcher V20211112"
 # command to launch
-player='./nogo --shell --name="Hollow" --black="mcts T=1000" --white="mcts T=1000"'
+player='./nogo --shell --name="Teio" --black="mcts simu=30000 RAVE time=300 parallel=4" --white="mcts simu=30000 RAVE time=300 parallel=4"'
 # port for binding
 port=${1:-auto}
 # display mode: states or commands

@@ -83,6 +83,7 @@ public:
 		if (role() == "black") who = board::black;
 		if (role() == "white") who = board::white;
 		if (meta.count("mcts")) search_algo = "mcts";
+		if (meta.count("RAVE")) RAVE = true;
 		if (meta.count("simu")) max_iter = meta["simu"];
 		if (meta.count("time")) max_time = meta["time"];
 		if (meta.count("parallel")) parallel = meta["parallel"];
@@ -96,7 +97,7 @@ public:
 	virtual void open_episode(const std::string& flag = "") {
 		for(int i=0;i<parallel;i++) {
 			board* init = new board;
-			trees[i] = new MCTS_tree(init, who, max_time);
+			trees[i] = new MCTS_tree(init, who, max_time, RAVE);
 		}
 	}
 
@@ -135,13 +136,11 @@ public:
 			for(int j=0;j<parallel;j++) {
 				tot+=trees[j]->get_simulation_cnt(i);
 			}
-			//cout << trees[0]->get_simulation_cnt(i) << trees[1]->get_simulation_cnt(i) << endl;
 			if(tot > best_cnt) {
 				best_cnt = tot;
 				best_idx = i;
 			}
 		}
-		//cout << best_cnt << endl;
  		action::place move(best_idx, who);
 		board b = st;
 		if(move.apply(b) != board::legal) return action();
@@ -153,14 +152,15 @@ public:
 		return move;
 	}
 
-	double remainingtime(double sec, board b){
-		return sec/(1.0 + 1.0*b.count_stone());
+	int remainingtime(double sec, board b){
+		int cnt = b.count_stone();
+		return sec/(cnt+1);
 	}
 
 	void do_mcts(int i, board b){
 		MCTS_node* tmp = new MCTS_node(NULL, new board(b), NULL, who, who);
 		trees[i]->advance_tree(tmp);
-		trees[i]->max_time -= trees[i]->grow(max_iter, remainingtime(trees[i]->max_time, b), p_earlystop);
+		trees[i]->max_time -= trees[i]->grow(max_iter, 10, p_earlystop);
 	}
 
 private:
@@ -172,5 +172,6 @@ private:
 	double p_earlystop = 0.9;
 	std::vector<action::place> space;
 	board::piece_type who;
+	bool RAVE=false;
 };
 
